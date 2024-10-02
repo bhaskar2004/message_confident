@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symmetric Two-Way Encrypted Messaging App with Timestamps</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #f5f5f5;
+            --text-color: #333;
+            --border-color: #ddd;
+            --user-a-color: #e6f3ff;
+            --user-b-color: #f0f0f0;
+            --time-color: #888;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+        }
+
+        .app-container {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-column {
+            flex: 1;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .user-a { background-color: var(--user-a-color); }
+        .user-b { background-color: var(--user-b-color); }
+
+        .message-area {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: white;
+        }
+
+        .message {
+            background-color: var(--secondary-color);
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+
+        .message-time {
+            font-size: 0.8em;
+            color: var(--time-color);
+            margin-top: 4px;
+        }
+
+        .message-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            resize: vertical;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        button:active { transform: translateY(1px); }
+
+        .send-btn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .send-btn:hover { background-color: #3a80d2; }
+
+        .toggle-btn {
+            background-color: #e0e0e0;
+        }
+
+        .toggle-btn:hover { background-color: #d0d0d0; }
+
+        .toggle-btn.active {
+            background-color: #4caf50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Symmetric Two-Way Encrypted Messaging App with Timestamps</h1>
+    <div class="app-container">
+        <div class="user-column user-a">
+            <h2>User A</h2>
+            <div id="userAMessageArea" class="message-area"></div>
+            <textarea id="userAInput" class="message-input" placeholder="Type your message here" rows="3"></textarea>
+            <div class="button-group">
+                <button id="userASendBtn" class="send-btn">Send</button>
+                <button id="userAEncryptToggle" class="toggle-btn">Encryption: OFF</button>
+                <button id="userADecryptToggle" class="toggle-btn">Decryption: OFF</button>
+            </div>
+        </div>
+        <div class="user-column user-b">
+            <h2>User B</h2>
+            <div id="userBMessageArea" class="message-area"></div>
+            <textarea id="userBInput" class="message-input" placeholder="Type your message here" rows="3"></textarea>
+            <div class="button-group">
+                <button id="userBSendBtn" class="send-btn">Send</button>
+                <button id="userBEncryptToggle" class="toggle-btn">Encryption: OFF</button>
+                <button id="userBDecryptToggle" class="toggle-btn">Decryption: OFF</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setupUser(userId) {
+            const messageArea = document.getElementById(`${userId}MessageArea`);
+            const input = document.getElementById(`${userId}Input`);
+            const sendBtn = document.getElementById(`${userId}SendBtn`);
+            const encryptToggle = document.getElementById(`${userId}EncryptToggle`);
+            const decryptToggle = document.getElementById(`${userId}DecryptToggle`);
+            
+            let encryptionEnabled = false;
+            let decryptionEnabled = false;
+
+            return { messageArea, input, sendBtn, encryptToggle, decryptToggle, encryptionEnabled, decryptionEnabled };
+        }
+
+        const userA = setupUser('userA');
+        const userB = setupUser('userB');
+        let messages = [];
+
+        function xorEncryptDecrypt(text, key) {
+            return text.split('').map((char, index) => 
+                String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(index % key.length))
+            ).join('');
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function sendMessage(sender) {
+            const user = sender === 'userA' ? userA : userB;
+            let message = user.input.value.trim();
+            if (message) {
+                const encrypted = user.encryptionEnabled ? xorEncryptDecrypt(message, 'secretkey') : message;
+                messages.push({
+                    text: encrypted,
+                    wasEncrypted: user.encryptionEnabled,
+                    sender: sender,
+                    timestamp: new Date()
+                });
+                displayMessages();
+                user.input.value = '';
+            }
+        }
+
+        function displayMessages() {
+            userA.messageArea.innerHTML = '';
+            userB.messageArea.innerHTML = '';
+            messages.forEach(msg => {
+                const msgForA = document.createElement('div');
+                const msgForB = document.createElement('div');
+                
+                let decryptedText = msg.wasEncrypted ? xorEncryptDecrypt(msg.text, 'secretkey') : msg.text;
+                
+                msgForA.innerHTML = `
+                    <strong>${msg.sender === 'userA' ? 'You' : 'User B'}:</strong> 
+                    ${msg.sender === 'userA' || !msg.wasEncrypted || userA.decryptionEnabled ? decryptedText : msg.text}
+                    <div class="message-time">${formatTime(msg.timestamp)}</div>
+                `;
+                msgForA.className = 'message';
+                userA.messageArea.appendChild(msgForA);
+
+                msgForB.innerHTML = `
+                    <strong>${msg.sender === 'userB' ? 'You' : 'User A'}:</strong> 
+                    ${msg.sender === 'userB' || !msg.wasEncrypted || userB.decryptionEnabled ? decryptedText : msg.text}
+                    <div class="message-time">${formatTime(msg.timestamp)}</div>
+                `;
+                msgForB.className = 'message';
+                userB.messageArea.appendChild(msgForB);
+            });
+            userA.messageArea.scrollTop = userA.messageArea.scrollHeight;
+            userB.messageArea.scrollTop = userB.messageArea.scrollHeight;
+        }
+
+        function setupEventListeners(user, userId) {
+            user.sendBtn.addEventListener('click', () => sendMessage(userId));
+            user.input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage(userId);
+                }
+            });
+            user.encryptToggle.addEventListener('click', () => {
+                user.encryptionEnabled = !user.encryptionEnabled;
+                user.encryptToggle.textContent = `Encryption: ${user.encryptionEnabled ? 'ON' : 'OFF'}`;
+                user.encryptToggle.classList.toggle('active', user.encryptionEnabled);
+            });
+            user.decryptToggle.addEventListener('click', () => {
+                user.decryptionEnabled = !user.decryptionEnabled;
+                user.decryptToggle.textContent = `Decryption: ${user.decryptionEnabled ? 'ON' : 'OFF'}`;
+                user.decryptToggle.classList.toggle('active', user.decryptionEnabled);
+                displayMessages();
+            });
+        }
+
+        setupEventListeners(userA, 'userA');
+        setupEventListeners(userB, 'userB');
+    </script>
+</body>
+</html>
